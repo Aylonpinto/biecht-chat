@@ -1,14 +1,15 @@
 services:
   voice-chat:
     build: .
-    environment:
-      - PYNPUT_BACKEND=evdev
     devices:
       - /dev/snd:/dev/snd
       - /dev/input:/dev/input
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=${XAUTHORITY}
     volumes:
-      - /run/udev:/run/udev:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${HOME}/.Xauthority:/root/.Xauthority
     network_mode: host
     privileged: true
-    user: root
     restart: unless-stopped

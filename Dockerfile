@@ -10,10 +10,10 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libudev-dev \
     libevdev-dev \
+    udev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create input group and add root to it for device access
-RUN groupadd -f input && usermod -a -G input root
+# No special group setup needed for X11 forwarding
 
 WORKDIR /app
 
