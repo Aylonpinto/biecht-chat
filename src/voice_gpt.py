@@ -100,15 +100,15 @@ def extract_voice_and_clean_text(text):
 def speak(text, voice="nova"):
     print(f"🔊 Voorlezen met stem: {voice}")
     response = client.audio.speech.create(
-        model="tts-1", voice=voice, input=text, response_format="wav"
+        model="tts-1", voice=voice, input=text, response_format="mp3"
     )
-    with open("response.wav", "wb") as f:
+    with open("response.mp3", "wb") as f:
         f.write(response.content)
 
     # Stop elevator music and immediately start response
     print("🎵 Playing response...")
     stop_elevator_music()
-    pygame.mixer.music.load("response.wav")
+    pygame.mixer.music.load("response.mp3")
     pygame.mixer.music.play()
 
     # Wait for playback to finish
@@ -122,11 +122,11 @@ def play_elevator_music():
     global stop_elevator
     stop_elevator = False
 
-    if os.path.exists("elevator.wav"):
+    if os.path.exists("elevator.mp3"):
 
         def play_loop():
             global stop_elevator
-            elevator_sound = pygame.mixer.Sound("elevator.wav")
+            elevator_sound = pygame.mixer.Sound("elevator.mp3")
             while not stop_elevator:
                 elevator_sound.play()
                 # Wait for the sound to finish or stop signal
