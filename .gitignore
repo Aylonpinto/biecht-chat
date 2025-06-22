@@ -1,3 +1,7 @@
+# Temporary audio files
+recording.wav
+response.mp3
+
 .env
 __pycache__/
 .DS_Store
