@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y \
     libevdev-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Add root to input group for device access
+RUN usermod -a -G input root
+
 WORKDIR /app
 
 # Install Python dependencies
