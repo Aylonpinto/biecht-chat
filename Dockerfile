@@ -10,10 +10,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libudev-dev \
     libevdev-dev \
-    udev \
     && rm -rf /var/lib/apt/lists/*
-
-# No special group setup needed for X11 forwarding
 
 WORKDIR /app
 

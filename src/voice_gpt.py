@@ -2,7 +2,8 @@ import os
 import tempfile
 import sounddevice as sd
 from scipy.io.wavfile import write
-from pynput import keyboard
+import evdev
+from evdev import InputDevice, categorize, ecodes
 import openai
 import re
 import numpy as np
@@ -12,6 +13,7 @@ import time
 import subprocess
 import math
 import pygame
+import select
 
 # Load environment variables
 load_dotenv()
@@ -155,36 +157,62 @@ def play_waiting_sequence():
     play_elevator_music()
 
 
-def on_press(key):
+def find_keyboard_device():
+    """Find the keyboard device that responds to spacebar"""
+    devices = [InputDevice(path) for path in evdev.list_devices()]
+    for device in devices:
+        # Look for devices that support the spacebar key (KEY_SPACE = 57)
+        if ecodes.KEY_SPACE in device.capabilities().get(ecodes.EV_KEY, []):
+            print(f"Found keyboard device: {device.path} - {device.name}")
+            return device
+    return None
+
+def handle_events():
+    """Handle keyboard events using evdev"""
     global is_recording
-    if key == keyboard.Key.space and not is_recording:
-        is_recording = True
-        start_recording()
+    
+    device = find_keyboard_device()
+    if not device:
+        print("❌ No keyboard device found!")
+        return
+    
+    print(f"🎹 Listening for spacebar on: {device.name}")
+    print("Druk op spatie om te spreken (loslaten = verzenden). Ctrl+C om te stoppen.")
+    
+    try:
+        for event in device.read_loop():
+            if event.type == ecodes.EV_KEY:
+                # Spacebar keycode is 57 (0x39)
+                if event.code == ecodes.KEY_SPACE:
+                    if event.value == 1:  # Key press
+                        if not is_recording:
+                            is_recording = True
+                            start_recording()
+                    elif event.value == 0:  # Key release
+                        if is_recording:
+                            is_recording = False
+                            filename = stop_recording_and_save()
 
+                            if filename is None:
+                                continue
 
-def on_release(key):
-    global is_recording
-    if key == keyboard.Key.space and is_recording:
-        is_recording = False
-        filename = stop_recording_and_save()
+                            # Start elevator music immediately after recording stops
+                            play_waiting_sequence()
 
-        if filename is None:
-            return
+                            transcript = transcribe_audio(filename)
+                            answer_with_tag = ask_chatgpt(transcript)
+                            voice, answer = extract_voice_and_clean_text(answer_with_tag)
 
-        # Start elevator music immediately after recording stops
-        play_waiting_sequence()
+                            print(f"\n🤖 Antwoord: {answer} [{voice}]")
+                            speak(answer, voice=voice)
+                            
+                            # Clean up temp file
+                            os.unlink(filename)
+                            
+    except KeyboardInterrupt:
+        print("\n👋 Programma gestopt.")
+    except Exception as e:
+        print(f"❌ Error: {e}")
 
-        transcript = transcribe_audio(filename)
-        answer_with_tag = ask_chatgpt(transcript)
-        voice, answer = extract_voice_and_clean_text(answer_with_tag)
-
-        print(f"\n🤖 Antwoord: {answer} [{voice}]")
-        speak(answer, voice=voice)
-
-
-# Start listener
-print(
-    "Druk op spatie om te spreken (loslaten = verzenden). Ctrl+C om te stoppen."
-)
-with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
-    listener.join()
+# Start event handler
+handle_events()
