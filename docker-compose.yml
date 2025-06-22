@@ -1,0 +1,11 @@
+services:
+  voice-chat:
+    build: .
+    environment:
+      - PYNPUT_BACKEND=evdev
+    devices:
+      - /dev/snd:/dev/snd
+      - /dev/input:/dev/input
+    network_mode: host
+    privileged: true
+    restart: unless-stopped
