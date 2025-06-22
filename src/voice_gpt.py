@@ -7,6 +7,11 @@ import openai
 import re
 import numpy as np
 from dotenv import load_dotenv
+import threading
+import time
+import subprocess
+import math
+import pygame
 
 # Load environment variables
 load_dotenv()
@@ -20,6 +25,13 @@ samplerate = 44100
 channels = 1
 recording = []
 is_recording = False
+stop_elevator = False
+
+# Initialize pygame mixer
+pygame.mixer.init()
+
+
+PROMPT = "Je bent een licht aangeschoten italiaan die de persoon die de vraagt stelt stiekem probeert te versieren."
 
 
 def start_recording():
@@ -33,7 +45,9 @@ def start_recording():
         recording.append(indata.copy())
 
     global stream
-    stream = sd.InputStream(samplerate=samplerate, channels=channels, callback=callback)
+    stream = sd.InputStream(
+        samplerate=samplerate, channels=channels, callback=callback
+    )
     stream.start()
 
 
@@ -43,7 +57,10 @@ def stop_recording_and_save():
     stream.stop()
     stream.close()
 
-    audio_data = b"".join([chunk.tobytes() for chunk in recording])
+    if not recording:
+        print("⚠️  Geen audio opgenomen!")
+        return None
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
         audio_data = np.concatenate(recording, axis=0)
         write(f.name, samplerate, audio_data)
@@ -53,7 +70,9 @@ def stop_recording_and_save():
 def transcribe_audio(filename):
     print("📤 Versturen naar Whisper...")
     with open(filename, "rb") as f:
-        transcript = client.audio.transcriptions.create(model="whisper-1", file=f)
+        transcript = client.audio.transcriptions.create(
+            model="whisper-1", file=f
+        )
     print(f"📄 Transcript: {transcript.text}")
     return transcript.text
 
@@ -63,7 +82,7 @@ def ask_chatgpt(prompt):
     messages = [
         {
             "role": "system",
-            "content": "Je bent een rijke zakenman waar alles draait om geld en succes. Sluit elk antwoord af met een stem in dit formaat: [voice:nova|shimmer|echo|fable|onyx|alloy]. Kies een stem die past bij de toon.",
+            "content": f"{PROMPT}Sluit elk antwoord af met een stem in dit formaat: [voice:nova|shimmer|echo|fable|onyx|alloy]. Kies een stem die past bij de toon.",
         },
         {"role": "user", "content": prompt},
     ]
@@ -80,12 +99,60 @@ def extract_voice_and_clean_text(text):
 
 def speak(text, voice="nova"):
     print(f"🔊 Voorlezen met stem: {voice}")
-    response = client.audio.speech.create(model="tts-1", voice=voice, input=text)
-    with open("response.mp3", "wb") as f:
+    response = client.audio.speech.create(
+        model="tts-1", voice=voice, input=text, response_format="wav"
+    )
+    with open("response.wav", "wb") as f:
         f.write(response.content)
 
-    # Mac: afplay | Linux/RPi: mpg123 of ffplay
-    os.system("afplay response.mp3")  # <- pas aan indien nodig
+    # Stop elevator music and immediately start response
+    print("🎵 Playing response...")
+    stop_elevator_music()
+    pygame.mixer.music.load("response.wav")
+    pygame.mixer.music.play()
+
+    # Wait for playback to finish
+    while pygame.mixer.music.get_busy():
+        time.sleep(0.1)
+    print("✅ Playback completed")
+
+
+def play_elevator_music():
+    """Play continuous elevator music in background"""
+    global stop_elevator
+    stop_elevator = False
+
+    if os.path.exists("elevator.wav"):
+
+        def play_loop():
+            global stop_elevator
+            elevator_sound = pygame.mixer.Sound("elevator.wav")
+            while not stop_elevator:
+                elevator_sound.play()
+                # Wait for the sound to finish or stop signal
+                duration = elevator_sound.get_length()
+                start_time = time.time()
+                while time.time() - start_time < duration and not stop_elevator:
+                    time.sleep(0.1)
+
+        # Start playing in a thread
+        music_thread = threading.Thread(target=play_loop)
+        music_thread.daemon = True
+        music_thread.start()
+
+
+def stop_elevator_music():
+    """Stop elevator music"""
+    global stop_elevator
+    stop_elevator = True
+    # Stop all sounds immediately
+    pygame.mixer.stop()
+
+
+def play_waiting_sequence():
+    """Play elevator music"""
+    # Start elevator music immediately without thread delay
+    play_elevator_music()
 
 
 def on_press(key):
@@ -100,14 +167,24 @@ def on_release(key):
     if key == keyboard.Key.space and is_recording:
         is_recording = False
         filename = stop_recording_and_save()
+
+        if filename is None:
+            return
+
+        # Start elevator music immediately after recording stops
+        play_waiting_sequence()
+
         transcript = transcribe_audio(filename)
         answer_with_tag = ask_chatgpt(transcript)
         voice, answer = extract_voice_and_clean_text(answer_with_tag)
+
         print(f"\n🤖 Antwoord: {answer} [{voice}]")
         speak(answer, voice=voice)
 
 
 # Start listener
-print("Druk op spatie om te spreken (loslaten = verzenden). Ctrl+C om te stoppen.")
+print(
+    "Druk op spatie om te spreken (loslaten = verzenden). Ctrl+C om te stoppen."
+)
 with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
     listener.join()
