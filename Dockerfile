@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
     portaudio19-dev \
     linux-headers-generic \
     build-essential \
+    libudev-dev \
+    libevdev-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
