@@ -6,6 +6,6 @@ services:
       - /dev/input:/dev/input
     volumes:
       - /run/udev:/run/udev:ro
-    # network_mode: host
+    network_mode: host
     privileged: true
     restart: unless-stopped
