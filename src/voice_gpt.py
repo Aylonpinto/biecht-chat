@@ -23,7 +23,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 client = openai
 
 # Audio settings
-samplerate = 44100
+samplerate = 16000
 channels = 1
 recording = []
 is_recording = False
@@ -48,7 +48,8 @@ def start_recording():
 
     global stream
     stream = sd.InputStream(
-        device=1, samplerate=samplerate, channels=channels, callback=callback
+        device=1, samplerate=samplerate, channels=channels, 
+        blocksize=1024, callback=callback
     )
     stream.start()
 
