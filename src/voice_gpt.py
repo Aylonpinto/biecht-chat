@@ -23,7 +23,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 client = openai
 
 # Audio settings
-samplerate = 16000
+samplerate = 44100
 channels = 1
 recording = []
 is_recording = False
