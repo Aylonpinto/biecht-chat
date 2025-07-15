@@ -54,7 +54,7 @@ def start_recording():
 
     global stream
     stream = sd.InputStream(
-        device=3, samplerate=samplerate, channels=channels, 
+        device=1, samplerate=samplerate, channels=channels, 
         callback=callback
     )
     stream.start()
