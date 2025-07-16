@@ -31,7 +31,7 @@ channels = 1
 recording = []
 is_recording = False
 stop_elevator = False
-speaker_keepalive_minutes = 4
+speaker_keepalive_minutes = 1
 
 # Initialize pygame mixer
 pygame.mixer.init()
@@ -166,7 +166,7 @@ def keep_speaker_alive():
     try:
         if os.path.exists("keepalive.mp3"):
             pygame.mixer.music.load("keepalive.mp3")
-            pygame.mixer.music.set_volume(0.05)
+            pygame.mixer.music.set_volume(0.5)
             pygame.mixer.music.play()
 
             while pygame.mixer.music.get_busy():
