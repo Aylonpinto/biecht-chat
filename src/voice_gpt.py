@@ -14,6 +14,9 @@ import subprocess
 import math
 import pygame
 import select
+import csv
+import datetime
+from conversation_manager import ConversationManager
 
 # Load environment variables
 load_dotenv()
@@ -28,12 +31,16 @@ channels = 1
 recording = []
 is_recording = False
 stop_elevator = False
+speaker_keepalive_minutes = 4
 
 # Initialize pygame mixer
 pygame.mixer.init()
 
 
 PROMPT = "Je bent een licht aangeschoten italiaan die de persoon die de vraagt stelt stiekem probeert te versieren."
+
+# Initialize conversation manager
+conversation_manager = ConversationManager()
 
 
 def start_recording():
@@ -48,7 +55,7 @@ def start_recording():
 
     global stream
     stream = sd.InputStream(
-        device=3, samplerate=samplerate, channels=channels, 
+        device=1, samplerate=samplerate, channels=channels, 
         callback=callback
     )
     stream.start()
@@ -82,15 +89,21 @@ def transcribe_audio(filename):
 
 def ask_chatgpt(prompt):
     print("🤖 Versturen naar ChatGPT...")
-    messages = [
-        {
-            "role": "system",
-            "content": f"{PROMPT}Sluit elk antwoord af met een stem in dit formaat: [voice:nova|shimmer|echo|fable|onyx|alloy]. Kies een stem die past bij de toon.",
-        },
-        {"role": "user", "content": prompt},
-    ]
+    
+    if conversation_manager.is_conversation_expired():
+        conversation_manager.start_new_conversation()
+    
+    conversation_manager.log_interaction("user", prompt)
+    
+    system_prompt = f"{PROMPT}Sluit elk antwoord af met een stem in dit formaat: [voice:nova|shimmer|echo|fable|onyx|alloy]. Kies een stem die past bij de toon."
+    messages = conversation_manager.get_conversation_for_openai(system_prompt)
+    
     response = client.chat.completions.create(model="gpt-4", messages=messages)
-    return response.choices[0].message.content
+    answer = response.choices[0].message.content
+    
+    conversation_manager.log_interaction("assistant", answer)
+    
+    return answer
 
 
 def extract_voice_and_clean_text(text):
@@ -145,11 +158,40 @@ def play_elevator_music():
 
 
 def stop_elevator_music():
-    """Stop elevator music"""
     global stop_elevator
     stop_elevator = True
-    # Stop all sounds immediately
     pygame.mixer.stop()
+
+
+def keep_speaker_alive():
+    try:
+        silent_audio = np.zeros((int(samplerate * 0.1), 1))
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+            write(f.name, samplerate, silent_audio.astype(np.int16))
+            
+            pygame.mixer.music.load(f.name)
+            pygame.mixer.music.set_volume(0.01)
+            pygame.mixer.music.play()
+            
+            while pygame.mixer.music.get_busy():
+                time.sleep(0.01)
+            
+            pygame.mixer.music.set_volume(1.0)
+            os.unlink(f.name)
+    except Exception as e:
+        print(f"Keep-alive error: {e}")
+
+
+def start_speaker_keepalive():
+    def keepalive_loop():
+        while True:
+            time.sleep(speaker_keepalive_minutes * 60)
+            keep_speaker_alive()
+    
+    keepalive_thread = threading.Thread(target=keepalive_loop)
+    keepalive_thread.daemon = True
+    keepalive_thread.start()
+    print(f"🔊 Speaker keep-alive started (every {speaker_keepalive_minutes} minutes)")
 
 
 def play_waiting_sequence():
@@ -215,5 +257,6 @@ def handle_events():
     except Exception as e:
         print(f"❌ Error: {e}")
 
-# Start event handler
+# Start speaker keep-alive and event handler
+start_speaker_keepalive()
 handle_events()
