@@ -37,7 +37,7 @@ speaker_keepalive_minutes = 4
 pygame.mixer.init()
 
 
-PROMPT = "Je bent een licht aangeschoten italiaan die de persoon die de vraagt stelt stiekem probeert te versieren."
+PROMPT = "Jij bent een geile pastoor waar festival bezoekers hun zonden kunnen opbiechten. Vertel aan het begin van het gesprek dat ze kunnen praten als ze de rode knop ingedrukt houden."
 
 # Initialize conversation manager
 conversation_manager = ConversationManager()
@@ -55,8 +55,7 @@ def start_recording():
 
     global stream
     stream = sd.InputStream(
-        device=1, samplerate=samplerate, channels=channels, 
-        callback=callback
+        device=1, samplerate=samplerate, channels=channels, callback=callback
     )
     stream.start()
 
@@ -89,20 +88,20 @@ def transcribe_audio(filename):
 
 def ask_chatgpt(prompt):
     print("🤖 Versturen naar ChatGPT...")
-    
+
     if conversation_manager.is_conversation_expired():
         conversation_manager.start_new_conversation()
-    
+
     conversation_manager.log_interaction("user", prompt)
-    
+
     system_prompt = f"{PROMPT}Sluit elk antwoord af met een stem in dit formaat: [voice:nova|shimmer|echo|fable|onyx|alloy]. Kies een stem die past bij de toon."
     messages = conversation_manager.get_conversation_for_openai(system_prompt)
-    
+
     response = client.chat.completions.create(model="gpt-4", messages=messages)
     answer = response.choices[0].message.content
-    
+
     conversation_manager.log_interaction("assistant", answer)
-    
+
     return answer
 
 
@@ -169,10 +168,10 @@ def keep_speaker_alive():
             pygame.mixer.music.load("keepalive.mp3")
             pygame.mixer.music.set_volume(0.05)
             pygame.mixer.music.play()
-            
+
             while pygame.mixer.music.get_busy():
                 time.sleep(0.1)
-            
+
             pygame.mixer.music.set_volume(1.0)
             print("🔊 Keep-alive message played")
         else:
@@ -186,11 +185,13 @@ def start_speaker_keepalive():
         while True:
             time.sleep(speaker_keepalive_minutes * 60)
             keep_speaker_alive()
-    
+
     keepalive_thread = threading.Thread(target=keepalive_loop)
     keepalive_thread.daemon = True
     keepalive_thread.start()
-    print(f"🔊 Speaker keep-alive started (every {speaker_keepalive_minutes} minutes)")
+    print(
+        f"🔊 Speaker keep-alive started (every {speaker_keepalive_minutes} minutes)"
+    )
 
 
 def play_waiting_sequence():
@@ -209,18 +210,21 @@ def find_keyboard_device():
             return device
     return None
 
+
 def handle_events():
     """Handle keyboard events using evdev"""
     global is_recording
-    
+
     device = find_keyboard_device()
     if not device:
         print("❌ No keyboard device found!")
         return
-    
+
     print(f"🎹 Listening for spacebar on: {device.name}")
-    print("Druk op spatie om te spreken (loslaten = verzenden). Ctrl+C om te stoppen.")
-    
+    print(
+        "Druk op spatie om te spreken (loslaten = verzenden). Ctrl+C om te stoppen."
+    )
+
     try:
         for event in device.read_loop():
             if event.type == ecodes.EV_KEY:
@@ -243,18 +247,21 @@ def handle_events():
 
                             transcript = transcribe_audio(filename)
                             answer_with_tag = ask_chatgpt(transcript)
-                            voice, answer = extract_voice_and_clean_text(answer_with_tag)
+                            voice, answer = extract_voice_and_clean_text(
+                                answer_with_tag
+                            )
 
                             print(f"\n🤖 Antwoord: {answer} [{voice}]")
                             speak(answer, voice=voice)
-                            
+
                             # Clean up temp file
                             os.unlink(filename)
-                            
+
     except KeyboardInterrupt:
         print("\n👋 Programma gestopt.")
     except Exception as e:
         print(f"❌ Error: {e}")
+
 
 # Start speaker keep-alive and event handler
 keep_speaker_alive()
