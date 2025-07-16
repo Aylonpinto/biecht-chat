@@ -165,19 +165,18 @@ def stop_elevator_music():
 
 def keep_speaker_alive():
     try:
-        silent_audio = np.zeros((int(samplerate * 0.1), 1))
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-            write(f.name, samplerate, silent_audio.astype(np.int16))
-            
-            pygame.mixer.music.load(f.name)
-            pygame.mixer.music.set_volume(0.01)
+        if os.path.exists("keepalive.mp3"):
+            pygame.mixer.music.load("keepalive.mp3")
+            pygame.mixer.music.set_volume(0.05)
             pygame.mixer.music.play()
             
             while pygame.mixer.music.get_busy():
-                time.sleep(0.01)
+                time.sleep(0.1)
             
             pygame.mixer.music.set_volume(1.0)
-            os.unlink(f.name)
+            print("🔊 Keep-alive message played")
+        else:
+            print("⚠️ No keepalive.mp3 found. Run record_keepalive.py first")
     except Exception as e:
         print(f"Keep-alive error: {e}")
 
@@ -258,5 +257,6 @@ def handle_events():
         print(f"❌ Error: {e}")
 
 # Start speaker keep-alive and event handler
+keep_speaker_alive()
 start_speaker_keepalive()
 handle_events()
