@@ -31,6 +31,7 @@ channels = 1
 recording = []
 is_recording = False
 stop_elevator = False
+speaker_keepalive_minutes = 4
 
 # Initialize pygame mixer
 pygame.mixer.init()
@@ -157,11 +158,40 @@ def play_elevator_music():
 
 
 def stop_elevator_music():
-    """Stop elevator music"""
     global stop_elevator
     stop_elevator = True
-    # Stop all sounds immediately
     pygame.mixer.stop()
+
+
+def keep_speaker_alive():
+    try:
+        silent_audio = np.zeros((int(samplerate * 0.1), 1))
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+            write(f.name, samplerate, silent_audio.astype(np.int16))
+            
+            pygame.mixer.music.load(f.name)
+            pygame.mixer.music.set_volume(0.01)
+            pygame.mixer.music.play()
+            
+            while pygame.mixer.music.get_busy():
+                time.sleep(0.01)
+            
+            pygame.mixer.music.set_volume(1.0)
+            os.unlink(f.name)
+    except Exception as e:
+        print(f"Keep-alive error: {e}")
+
+
+def start_speaker_keepalive():
+    def keepalive_loop():
+        while True:
+            time.sleep(speaker_keepalive_minutes * 60)
+            keep_speaker_alive()
+    
+    keepalive_thread = threading.Thread(target=keepalive_loop)
+    keepalive_thread.daemon = True
+    keepalive_thread.start()
+    print(f"🔊 Speaker keep-alive started (every {speaker_keepalive_minutes} minutes)")
 
 
 def play_waiting_sequence():
@@ -227,5 +257,6 @@ def handle_events():
     except Exception as e:
         print(f"❌ Error: {e}")
 
-# Start event handler
+# Start speaker keep-alive and event handler
+start_speaker_keepalive()
 handle_events()
