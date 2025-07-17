@@ -32,6 +32,8 @@ recording = []
 is_recording = False
 stop_elevator = False
 speaker_keepalive_minutes = 1
+processing = False
+last_keepalive_time = None
 
 # Initialize pygame mixer
 pygame.mixer.init()
@@ -171,6 +173,7 @@ def stop_elevator_music():
 
 
 def keep_speaker_alive():
+    global last_keepalive_time
     try:
         if os.path.exists("keepalive.mp3"):
             pygame.mixer.music.load("keepalive.mp3")
@@ -186,13 +189,16 @@ def keep_speaker_alive():
             print("⚠️ No keepalive.mp3 found. Run record_keepalive.py first")
     except Exception as e:
         print(f"Keep-alive error: {e}")
+    
+    last_keepalive_time = time.time()
 
 
 def start_speaker_keepalive():
     def keepalive_loop():
         while True:
-            time.sleep(speaker_keepalive_minutes * 60)
-            keep_speaker_alive()
+            if last_keepalive_time is None or (time.time() - last_keepalive_time) >= (speaker_keepalive_minutes * 60):
+                keep_speaker_alive()
+            time.sleep(30)
 
     keepalive_thread = threading.Thread(target=keepalive_loop)
     keepalive_thread.daemon = True
@@ -220,8 +226,7 @@ def find_keyboard_device():
 
 
 def handle_events():
-    """Handle keyboard events using evdev"""
-    global is_recording
+    global is_recording, processing, last_keepalive_time
 
     device = find_keyboard_device()
     if not device:
@@ -236,28 +241,33 @@ def handle_events():
     try:
         for event in device.read_loop():
             if event.type == ecodes.EV_KEY:
-                # Spacebar keycode is 57 (0x39)
                 if event.code == ecodes.KEY_SPACE:
-                    if event.value == 1:  # Key press
-                        if not is_recording:
+                    if event.value == 1:
+                        if not is_recording and not processing:
                             is_recording = True
                             start_recording()
-                    elif event.value == 0:  # Key release
+                        elif processing:
+                            stop_elevator_music()
+                            processing = False
+                            is_recording = True
+                            start_recording()
+                    elif event.value == 0:
                         if is_recording:
                             is_recording = False
+                            processing = True
                             filename = stop_recording_and_save()
 
                             if filename is None:
+                                processing = False
                                 continue
 
-                            # Start elevator music immediately after recording stops
                             play_waiting_sequence()
 
                             transcript = transcribe_audio(filename)
                             
                             if transcript is None:
-                                # Clean up temp file and continue
                                 os.unlink(filename)
+                                processing = False
                                 continue
                             
                             answer_with_tag = ask_chatgpt(transcript)
@@ -268,8 +278,10 @@ def handle_events():
                             print(f"\n🤖 Antwoord: {answer} [{voice}]")
                             speak(answer, voice=voice)
 
-                            # Clean up temp file
                             os.unlink(filename)
+                            processing = False
+                            
+                            last_keepalive_time = time.time()
 
     except KeyboardInterrupt:
         print("\n👋 Programma gestopt.")
