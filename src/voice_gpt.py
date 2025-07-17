@@ -78,12 +78,20 @@ def stop_recording_and_save():
 
 def transcribe_audio(filename):
     print("📤 Versturen naar Whisper...")
-    with open(filename, "rb") as f:
-        transcript = client.audio.transcriptions.create(
-            model="whisper-1", file=f
-        )
-    print(f"📄 Transcript: {transcript.text}")
-    return transcript.text
+    try:
+        with open(filename, "rb") as f:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1", file=f
+            )
+        print(f"📄 Transcript: {transcript.text}")
+        return transcript.text
+    except Exception as e:
+        if "too short" in str(e):
+            print("⚠️ Audio te kort, probeer opnieuw...")
+            return None
+        else:
+            print(f"❌ Transcriptie error: {e}")
+            return None
 
 
 def ask_chatgpt(prompt):
@@ -246,6 +254,12 @@ def handle_events():
                             play_waiting_sequence()
 
                             transcript = transcribe_audio(filename)
+                            
+                            if transcript is None:
+                                # Clean up temp file and continue
+                                os.unlink(filename)
+                                continue
+                            
                             answer_with_tag = ask_chatgpt(transcript)
                             voice, answer = extract_voice_and_clean_text(
                                 answer_with_tag
