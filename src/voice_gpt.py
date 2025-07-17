@@ -39,7 +39,7 @@ last_keepalive_time = None
 pygame.mixer.init()
 
 
-PROMPT = "Jij bent een geile pastoor waar festival bezoekers hun zonden kunnen opbiechten. Vertel aan het begin van het gesprek dat ze kunnen praten als ze de rode knop ingedrukt houden."
+PROMPT = "Jij bent een geile pastoor waar festival bezoekers hun zonden kunnen opbiechten. Vertel aan het begin van het gesprek dat ze de rode knop ingedrukt moeten houden tijdens het praten."
 
 # Initialize conversation manager
 conversation_manager = ConversationManager()
@@ -52,7 +52,7 @@ def start_recording():
 
     # Stop and close existing stream if it exists
     try:
-        if 'stream' in globals() and stream:
+        if "stream" in globals() and stream:
             stream.stop()
             stream.close()
     except:
@@ -150,7 +150,6 @@ def speak(text, voice="nova"):
 
 
 def play_elevator_music():
-    """Play continuous elevator music in background"""
     global stop_elevator
     stop_elevator = False
 
@@ -161,13 +160,11 @@ def play_elevator_music():
             elevator_sound = pygame.mixer.Sound("elevator.mp3")
             while not stop_elevator:
                 elevator_sound.play()
-                # Wait for the sound to finish or stop signal
                 duration = elevator_sound.get_length()
                 start_time = time.time()
                 while time.time() - start_time < duration and not stop_elevator:
                     time.sleep(0.1)
 
-        # Start playing in a thread
         music_thread = threading.Thread(target=play_loop)
         music_thread.daemon = True
         music_thread.start()
@@ -196,14 +193,16 @@ def keep_speaker_alive():
             print("⚠️ No keepalive.mp3 found. Run record_keepalive.py first")
     except Exception as e:
         print(f"Keep-alive error: {e}")
-    
+
     last_keepalive_time = time.time()
 
 
 def start_speaker_keepalive():
     def keepalive_loop():
         while True:
-            if last_keepalive_time is None or (time.time() - last_keepalive_time) >= (speaker_keepalive_minutes * 60):
+            if last_keepalive_time is None or (
+                time.time() - last_keepalive_time
+            ) >= (speaker_keepalive_minutes * 60):
                 keep_speaker_alive()
             time.sleep(30)
 
@@ -255,6 +254,7 @@ def handle_events():
                             start_recording()
                         elif processing:
                             stop_elevator_music()
+                            pygame.mixer.music.stop()
                             processing = False
                             is_recording = True
                             start_recording()
@@ -271,12 +271,12 @@ def handle_events():
                             play_waiting_sequence()
 
                             transcript = transcribe_audio(filename)
-                            
+
                             if transcript is None:
                                 os.unlink(filename)
                                 processing = False
                                 continue
-                            
+
                             answer_with_tag = ask_chatgpt(transcript)
                             voice, answer = extract_voice_and_clean_text(
                                 answer_with_tag
@@ -287,7 +287,7 @@ def handle_events():
 
                             os.unlink(filename)
                             processing = False
-                            
+
                             last_keepalive_time = time.time()
 
     except KeyboardInterrupt:
