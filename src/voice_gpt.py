@@ -46,16 +46,23 @@ conversation_manager = ConversationManager()
 
 
 def start_recording():
-    global recording
+    global recording, stream
     print("🎙️  Opname gestart. Houd de toets ingedrukt...")
     recording = []
+
+    # Stop and close existing stream if it exists
+    try:
+        if 'stream' in globals() and stream:
+            stream.stop()
+            stream.close()
+    except:
+        pass
 
     def callback(indata, frames, time, status):
         if status:
             print(status)
         recording.append(indata.copy())
 
-    global stream
     stream = sd.InputStream(
         device=1, samplerate=samplerate, channels=channels, callback=callback
     )
